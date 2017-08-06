@@ -1,0 +1,4 @@
+.vscode/
+pgn/*.pgn
+reports/*report.txt
+db/*.sqlite3
