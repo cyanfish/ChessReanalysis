@@ -9,7 +9,7 @@ class Player(Model):
         database = db
 
 class Game(Model):
-    id = CharField(unique=True)
+    id = CharField(primary_key=True)
     is_analyzed = BooleanField(default=False)
 
     class Meta:
@@ -32,15 +32,18 @@ class Move(Model):
     game = ForeignKeyField(Game)
     color = FixedCharField(max_length=1, choices=colors)
     number = SmallIntegerField()
-    pv1eval = SmallIntegerField()
-    pv2eval = SmallIntegerField()
-    pv3eval = SmallIntegerField()
-    pv4eval = SmallIntegerField()
-    pv5eval = SmallIntegerField()
-    eval = SmallIntegerField()
-    pv = SmallIntegerField()
+    pv1_eval = SmallIntegerField()
+    pv2_eval = SmallIntegerField(null=True)
+    pv3_eval = SmallIntegerField(null=True)
+    pv4_eval = SmallIntegerField(null=True)
+    pv5_eval = SmallIntegerField(null=True)
+    played_eval = SmallIntegerField()
+    played_rank = SmallIntegerField(null=True)
 
     class Meta:
         database = db
+        indexes = (
+            (('game', 'color', 'number'), True),
+        )
 
 db.create_tables([Player, Game, GamePlayer, Move], True)
