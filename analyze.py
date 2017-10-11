@@ -6,10 +6,11 @@ from collections import defaultdict
 book_depth = 10
 forced_move_thresh = 50
 unclear_pos_thresh = 100
-undecided_pos_thresh = 100
+undecided_pos_thresh = 200
 losing_pos_thresh = 500
 exclude_forced = True
 include_only_unclear = True
+exclude_flat = False
 
 class PgnSpyResult():
 
@@ -24,6 +25,7 @@ class PgnSpyResult():
         self.t2_count = 0
         self.t3_total = 0
         self.t3_count = 0
+        self.game_list = []
     
     @property
     def acpl(self):
@@ -44,16 +46,26 @@ def a1(working_set):
                 fout.write(f'T1: {result.t1_count}/{result.t1_total} {result.t1_count / result.t1_total:.1%}\n')
             if result.acpl:
                 fout.write(f'ACPL: {result.acpl:.1f} ({result.sample_size})\n')
+            fout.write(' '.join(result.game_list) + '\n')
+            fout.write('\n')
 
 
 def a1_game(results, game_obj, color, player):
-    moves = list(Move.select().where(Move.game == game_obj, Move.color == color).order_by(Move.number))
+    moves = list(Move.select().where(Move.game == game_obj).order_by(Move.number, -Move.color))
 
     r = results[player]
+    r.game_list.append(game_obj.id)
 
+    evals = []
     for m in moves:
+        if m.color != color:
+            evals.append(-m.pv1_eval)
+            continue
+        evals.append(m.pv1_eval)
+
         if m.number <= book_depth:
             continue
+
         if m.pv1_eval <= -undecided_pos_thresh or m.pv1_eval >= undecided_pos_thresh:
             continue
         if m.pv2_eval and m.pv1_eval <= m.pv2_eval + forced_move_thresh and m.pv1_eval <= m.pv2_eval + unclear_pos_thresh:
@@ -68,7 +80,12 @@ def a1_game(results, game_obj, color, player):
             r.t3_total += 1
             if m.played_rank and m.played_rank <= 3:
                 r.t3_count += 1
+
         cpl = max(m.pv1_eval - m.played_eval, 0)
+        if exclude_flat and cpl == 0 and evals[-3:] == [m.pv1_eval] * 3:
+            # Exclude flat evals from CPL, e.g. dead drawn endings
+            continue
+
         r.sample_size += 1
         r.sample_total_cpl += cpl
         if cpl > 0:
