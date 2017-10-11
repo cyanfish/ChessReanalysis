@@ -39,6 +39,8 @@ class Move(Model):
     pv5_eval = SmallIntegerField(null=True)
     played_eval = SmallIntegerField()
     played_rank = SmallIntegerField(null=True)
+    nodes = IntegerField(null=True)
+    masterdb_matches = IntegerField(null=True)
 
     class Meta:
         database = db

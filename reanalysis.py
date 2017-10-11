@@ -68,7 +68,10 @@ def mainloop():
         if i == '2':
             working_set.clear()
         if i == '3':
-            preprocess.run(working_set)
+            try:
+                preprocess.run(working_set)
+            except KeyboardInterrupt:
+                pass
         if i == '4':
             analyze.a1(working_set)
         if i == '5':
