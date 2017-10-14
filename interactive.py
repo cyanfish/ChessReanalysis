@@ -38,11 +38,16 @@ def addpgnloop():
         print('')
         for i, f in enumerate(files, 1):
             print(f'({i}) {f}')
+        print('(a) All')
         print('(0) Cancel')
 
         i = input()
 
         if i == '0':
+            return
+        if i.lower() == 'a':
+            for f in files:
+                addpgn(f)
             return
         try:
             f = files[int(i) - 1]
