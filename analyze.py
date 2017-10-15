@@ -17,6 +17,8 @@ class PgnSpyResult():
         self.t2_count = 0
         self.t3_total = 0
         self.t3_count = 0
+        self.min_rating = None
+        self.max_rating = None
         self.game_list = []
     
     def add(self, other):
@@ -30,8 +32,16 @@ class PgnSpyResult():
         self.t2_count += other.t2_count
         self.t3_total += other.t3_total
         self.t3_count += other.t3_count
+        self.with_rating(other.min_rating)
+        self.with_rating(other.max_rating)
         self.game_list += other.game_list
     
+    def with_rating(self, rating):
+        if rating is None:
+            return
+        self.min_rating = min(self.min_rating, rating) if self.min_rating else rating
+        self.max_rating = max(self.max_rating, rating) if self.max_rating else rating
+
     @property
     def acpl(self):
         return self.sample_total_cpl / float(self.sample_size) if self.sample_size else None
@@ -41,14 +51,14 @@ def a1(working_set):
     by_player = defaultdict(PgnSpyResult)
     by_game = defaultdict(PgnSpyResult)
     excluded = included = 0
-    for gid, game in working_set.items():
+    for gid, pgn in working_set.items():
         game_obj, _ = Game.get_or_create(id=gid)
         if not game_obj.is_analyzed:
             excluded += 1
             continue
 
-        a1_game(p, by_player, by_game, game_obj, 'w', GamePlayer.get(game=game_obj, color='w').player)
-        a1_game(p, by_player, by_game, game_obj, 'b', GamePlayer.get(game=game_obj, color='b').player)
+        a1_game(p, by_player, by_game, game_obj, pgn, 'w', GamePlayer.get(game=game_obj, color='w').player)
+        a1_game(p, by_player, by_game, game_obj, pgn, 'b', GamePlayer.get(game=game_obj, color='b').player)
         included += 1
     print(f'Skipping {excluded} games that haven\'t been pre-processed')
 
@@ -56,7 +66,7 @@ def a1(working_set):
     with open(out_path, 'w') as fout:
         fout.write('------ BY PLAYER ------\n\n')
         for player, result in sorted(by_player.items(), key=lambda i:-i[1].t3_count/(i[1].t3_total or 1)):
-            fout.write(f'{player.username}\n')
+            fout.write(f'{player.username} ({result.min_rating} - {result.max_rating})\n')
             if result.t1_total:
                 fout.write(f'T1: {result.t1_count}/{result.t1_total} {result.t1_count / result.t1_total:.1%}\n')
             if result.t2_total:
@@ -70,7 +80,7 @@ def a1(working_set):
 
         fout.write('\n------ BY GAME ------\n\n')
         for (player, gameid), result in sorted(by_game.items(), key=lambda i:-i[1].t3_count/(i[1].t3_total or 1)):
-            fout.write(f'{player.username}\n')
+            fout.write(f'{player.username} ({result.min_rating})\n')
             if result.t1_total:
                 fout.write(f'T1: {result.t1_count}/{result.t1_total} {result.t1_count / result.t1_total:.1%}\n')
             if result.t2_total:
@@ -83,11 +93,15 @@ def a1(working_set):
             fout.write('\n')
     print(f'Wrote report on {included} games to "{out_path}"')
 
-def a1_game(p, by_player, by_game, game_obj, color, player):
+def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
     moves = list(Move.select().where(Move.game == game_obj).order_by(Move.number, -Move.color))
 
     r = PgnSpyResult()
     r.game_list.append(game_obj.id)
+    try:
+        r.with_rating(int(pgn.headers['WhiteElo' if color == 'w' else 'BlackElo']))
+    except ValueError:
+        pass
 
     evals = []
     for m in moves:
