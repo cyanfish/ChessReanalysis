@@ -30,7 +30,7 @@ def addpgn(filename):
             if gid:
                 working_set[gid] = game
             n += 1
-        print(f'Added {n} games to working set')
+        print(f'Added {n} games to working set from {filename}')
 
 def addpgnloop():
     while True:
@@ -38,23 +38,25 @@ def addpgnloop():
         print('')
         for i, f in enumerate(files, 1):
             print(f'({i}) {f}')
-        print('(a) All')
+        print('(?) Enter a prefix to match multiple files')
         print('(0) Cancel')
 
         i = input()
 
         if i == '0':
             return
-        if i.lower() == 'a':
-            for f in files:
-                addpgn(f)
-            return
         try:
             f = files[int(i) - 1]
             addpgn(f)
             return
         except (IndexError, ValueError):
-            pass
+            ok = False
+            for f in files:
+                if f.split(os.sep)[-1].startswith(i):
+                    addpgn(f)
+                    ok = True
+            if ok:
+                return
 
 def mainloop():
     while True:
