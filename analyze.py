@@ -66,7 +66,8 @@ def a1(working_set):
         a1_game(p, by_player, by_game, game_obj, pgn, 'w', GamePlayer.get(game=game_obj, color='w').player)
         a1_game(p, by_player, by_game, game_obj, pgn, 'b', GamePlayer.get(game=game_obj, color='b').player)
         included += 1
-    print(f'Skipping {excluded} games that haven\'t been pre-processed')
+    if excluded:
+        print(f'Skipping {excluded} games that haven\'t been pre-processed')
 
     out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}.txt'
     with open(out_path, 'w') as fout:
