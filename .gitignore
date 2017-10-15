@@ -1,5 +1,6 @@
 .vscode/
 pgn/*.pgn
-reports/*report.txt
+reports/report*
 db/*.sqlite3
 engine/
+*.pyc
