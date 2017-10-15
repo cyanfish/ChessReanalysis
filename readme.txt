@@ -1,4 +1,5 @@
 Setup:
+Requires Python 3.6+
 pip install -r requirements.txt
 Edit config/engine.json to point to Stockfish (or your engine of choice)
 
