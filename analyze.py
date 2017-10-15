@@ -46,6 +46,12 @@ class PgnSpyResult():
     def acpl(self):
         return self.sample_total_cpl / float(self.sample_size) if self.sample_size else None
 
+    @property
+    def t3_sort(self):
+        if self.t3_total == 0:
+            return 0
+        return -wilson_interval(self.t3_count, self.t3_total)[0]
+
 def a1(working_set):
     p = load_a1_params()
     by_player = defaultdict(PgnSpyResult)
@@ -65,7 +71,7 @@ def a1(working_set):
     out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}.txt'
     with open(out_path, 'w') as fout:
         fout.write('------ BY PLAYER ------\n\n')
-        for player, result in sorted(by_player.items(), key=lambda i:-i[1].t3_count/(i[1].t3_total or 1)):
+        for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):
             fout.write(f'{player.username} ({result.min_rating} - {result.max_rating})\n')
             if result.t1_total:
                 fout.write(f'T1: {result.t1_count}/{result.t1_total} {result.t1_count / result.t1_total:.1%}\n')
@@ -79,7 +85,7 @@ def a1(working_set):
             fout.write('\n')
 
         fout.write('\n------ BY GAME ------\n\n')
-        for (player, gameid), result in sorted(by_game.items(), key=lambda i:-i[1].t3_count/(i[1].t3_total or 1)):
+        for (player, gameid), result in sorted(by_game.items(), key=lambda i: i[1].t3_sort):
             fout.write(f'{player.username} ({result.min_rating})\n')
             if result.t1_total:
                 fout.write(f'T1: {result.t1_count}/{result.t1_total} {result.t1_count / result.t1_total:.1%}\n')
@@ -146,3 +152,10 @@ def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
 def load_a1_params():
     with open('./config/params_for_a1.json') as config_f:
         return json.load(config_f)
+
+def wilson_interval(ns, n):
+    z = 1.96 # 0.95 confidence
+    a = 1 / (n + z**2)
+    b = ns + z**2 / 2
+    c = z * (ns * (n - ns) / n + z**2 / 4)**(1/2)
+    return (a * (b - c), a * (b + c))
