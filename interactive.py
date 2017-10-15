@@ -38,25 +38,25 @@ def addpgnloop():
         print('')
         for i, f in enumerate(files, 1):
             print(f'({i}) {f}')
-        print('(?) Enter a prefix to match multiple files')
+        print('(^) Enter a regex to match multiple files by name')
         print('(0) Cancel')
 
         i = input()
 
         if i == '0':
             return
+        if i.startswith('^'):
+            regex = re.compile(i)
+            for f in files:
+                if regex.match(f.split(os.sep)[-1]):
+                    addpgn(f)
+            return
         try:
             f = files[int(i) - 1]
             addpgn(f)
             return
         except (IndexError, ValueError):
-            ok = False
-            for f in files:
-                if f.split(os.sep)[-1].startswith(i):
-                    addpgn(f)
-                    ok = True
-            if ok:
-                return
+            pass
 
 def mainloop():
     while True:
