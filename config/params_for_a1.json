@@ -1,0 +1,11 @@
+{
+    "book_depth": 10,
+    "forced_move_thresh": 50,
+    "unclear_pos_thresh": 100,
+    "undecided_pos_thresh": 200,
+    "losing_pos_thresh": 500,
+    "exclude_forced": true,
+    "include_only_unclear": true,
+    "exclude_flat": true,
+    "max_cpl": 500
+}
