@@ -66,7 +66,7 @@ def mainloop():
         print('(2) Clear working set')
         print('(3) Pre-process')
         print('(4) Analysis 1')
-        print('(5) Exit')
+        print('(0) Exit')
 
         i = input()
 
@@ -81,8 +81,8 @@ def mainloop():
                 pass
         if i == '4':
             analyze.a1(working_set)
-        if i == '5':
-            quit()
+        if i == '0':
+            return
 
 if __name__ == "__main__":
     mainloop()
