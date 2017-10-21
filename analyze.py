@@ -122,15 +122,15 @@ def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
 
         if m.pv1_eval <= -p['undecided_pos_thresh'] or m.pv1_eval >= p['undecided_pos_thresh']:
             continue
-        if m.pv2_eval and m.pv1_eval <= m.pv2_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv2_eval + p['unclear_pos_thresh']:
+        if m.pv2_eval is not None and m.pv1_eval <= m.pv2_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv2_eval + p['unclear_pos_thresh']:
             r.t1_total += 1
             if m.played_rank and m.played_rank <= 1:
                 r.t1_count += 1
-        if m.pv3_eval and m.pv2_eval <= m.pv3_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv3_eval + p['unclear_pos_thresh']:
+        if m.pv3_eval is not None and m.pv2_eval <= m.pv3_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv3_eval + p['unclear_pos_thresh']:
             r.t2_total += 1
             if m.played_rank and m.played_rank <= 2:
                 r.t2_count += 1
-        if m.pv4_eval and m.pv3_eval <= m.pv4_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv4_eval + p['unclear_pos_thresh']:
+        if m.pv4_eval is not None and m.pv3_eval <= m.pv4_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv4_eval + p['unclear_pos_thresh']:
             r.t3_total += 1
             if m.played_rank and m.played_rank <= 3:
                 r.t3_count += 1
