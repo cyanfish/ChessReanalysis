@@ -52,7 +52,7 @@ class PgnSpyResult():
             return 0
         return -wilson_interval(self.t3_count, self.t3_total)[0]
 
-def a1(working_set):
+def a1(working_set, report_name):
     p = load_a1_params()
     by_player = defaultdict(PgnSpyResult)
     by_game = defaultdict(PgnSpyResult)
@@ -69,6 +69,7 @@ def a1(working_set):
     if excluded:
         print(f'Skipping {excluded} games that haven\'t been pre-processed')
 
+    out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}--{report_name}.txt'
     with open(out_path, 'w') as fout:
         fout.write('------ BY PLAYER ------\n\n')
         for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):

@@ -80,7 +80,11 @@ def mainloop():
             except KeyboardInterrupt:
                 pass
         if i == '4':
-            analyze.a1(working_set)
+            try:
+                report_name = input('Report name: ')
+                analyze.a1(working_set, report_name)
+            except KeyboardInterrupt:
+                pass
         if i == '0':
             return
 
