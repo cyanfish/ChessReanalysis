@@ -69,7 +69,6 @@ def a1(working_set):
     if excluded:
         print(f'Skipping {excluded} games that haven\'t been pre-processed')
 
-    out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}.txt'
     with open(out_path, 'w') as fout:
         fout.write('------ BY PLAYER ------\n\n')
         for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):
@@ -122,18 +121,24 @@ def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
 
         if m.pv1_eval <= -p['undecided_pos_thresh'] or m.pv1_eval >= p['undecided_pos_thresh']:
             continue
+        
         if m.pv2_eval is not None and m.pv1_eval <= m.pv2_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv2_eval + p['unclear_pos_thresh']:
-            r.t1_total += 1
-            if m.played_rank and m.played_rank <= 1:
-                r.t1_count += 1
-        if m.pv3_eval is not None and m.pv2_eval <= m.pv3_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv3_eval + p['unclear_pos_thresh']:
-            r.t2_total += 1
-            if m.played_rank and m.played_rank <= 2:
-                r.t2_count += 1
-        if m.pv4_eval is not None and m.pv3_eval <= m.pv4_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv4_eval + p['unclear_pos_thresh']:
-            r.t3_total += 1
-            if m.played_rank and m.played_rank <= 3:
-                r.t3_count += 1
+            if m.pv2_eval < m.pv1_eval:
+                r.t1_total += 1
+                if m.played_rank and m.played_rank <= 1:
+                    r.t1_count += 1
+
+            if m.pv3_eval is not None and m.pv2_eval <= m.pv3_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv3_eval + p['unclear_pos_thresh']:
+                if m.pv3_eval < m.pv2_eval:
+                    r.t2_total += 1
+                    if m.played_rank and m.played_rank <= 2:
+                        r.t2_count += 1
+
+                if m.pv4_eval is not None and m.pv3_eval <= m.pv4_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv4_eval + p['unclear_pos_thresh']:
+                    if m.pv4_eval < m.pv3_eval:
+                        r.t3_total += 1
+                        if m.played_rank and m.played_rank <= 3:
+                            r.t3_count += 1
 
         cpl = min(max(m.pv1_eval - m.played_eval, 0), p['max_cpl'])
         if p['exclude_flat'] and cpl == 0 and evals[-3:] == [m.pv1_eval] * 3:
