@@ -60,7 +60,7 @@ def run(working_set):
                         engine.position(board)
                         engine.setoption({'multipv': 1})
                         engine.go(nodes=engine_config['nodes'])
-                        played_eval = score_to_cp(info_handler.info['score'][1])
+                        played_eval = -score_to_cp(info_handler.info['score'][1])
                         board.pop()
                     else:
                         # The played move was in the top 5, so we can copy the corresponding eval to save time
