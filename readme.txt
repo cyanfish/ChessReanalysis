@@ -12,3 +12,7 @@ Terminology:
 Working set - A set games to pre-process or analyze
 Pre-process - Use an engine over the games in the working set. Results are persisted in db/data.sqlite3, so pre-processing can be killed and restarted at any time
 Analysis - Use an algorithm to aggregate the results into some useful metrics
+
+Note:
+Imported PGNs must include a tag like the following to uniquely identify the games:
+[Site "https://lichess.org/Qa7FJNk2"]
