@@ -13,7 +13,7 @@ def run(working_set):
         # Get the game DB object and the PGN moves
         game_obj, _ = Game.get_or_create(id=gid)
         pgn = working_set[gid]
-        moves = pgn.accept(MoveListVisitor())
+        moves = list(pgn.main_line())
         print(f'Processing {gid} ({len(moves)} moves) ({games_processed}/{len(to_process)})')
 
         white, _ = Player.get_or_create(username=pgn.headers['White'].lower())
@@ -26,10 +26,16 @@ def run(working_set):
         engine = init_engine(engine_config)
         info_handler = chess.uci.InfoHandler()
         engine.info_handlers.append(info_handler)
+
+        # Set up the board
+        board = pgn.board()
+        for m in moves:
+            board.push(m)
         
         # Process each move in the game in reverse order
         moves_processed = 0
-        for board, played_move in reversed(moves):
+        for played_move in reversed(moves):
+            board.pop()
             moves_processed += 1
             color = 'w' if board.turn == chess.WHITE else 'b'
             # Skip already-processed moves
@@ -99,13 +105,3 @@ def init_engine(config):
     engine.uci()
     engine.setoption(config['options'])
     return engine
-
-class MoveListVisitor(chess.pgn.BaseVisitor):
-    def begin_game(self):
-        self.moves = []
-
-    def visit_move(self, board, move):
-        self.moves.append((board.copy(), move))
-
-    def result(self):
-        return self.moves
