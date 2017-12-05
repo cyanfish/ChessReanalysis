@@ -63,10 +63,13 @@ def run(working_set):
                     if not played_index:
                         # The played move was not in the top 5, so we need to analyze it separately
                         board.push(played_move)
-                        engine.position(board)
-                        engine.setoption({'multipv': 1})
-                        engine.go(nodes=engine_config['nodes'])
-                        played_eval = -score_to_cp(info_handler.info['score'][1])
+                        if board.is_checkmate():
+                            played_eval = 29999 if board.turn == chess.BLACK else -29999
+                        else:
+                            engine.position(board)
+                            engine.setoption({'multipv': 1})
+                            engine.go(nodes=engine_config['nodes'])
+                            played_eval = -score_to_cp(info_handler.info['score'][1])
                         board.pop()
                     else:
                         # The played move was in the top 5, so we can copy the corresponding eval to save time
