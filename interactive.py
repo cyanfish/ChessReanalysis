@@ -80,9 +80,15 @@ def mainloop():
             except KeyboardInterrupt:
                 pass
         if i == '4':
+            print('(1) Normal output')
+            print('(2) CSV output')
+            j = input()
             try:
                 report_name = input('Report name: ')
-                analyze.a1(working_set, report_name)
+                if j == '1':
+                    analyze.a1(working_set, report_name)
+                if j == '2':
+                    analyze.a1csv(working_set, report_name)
             except KeyboardInterrupt:
                 pass
         if i == '0':

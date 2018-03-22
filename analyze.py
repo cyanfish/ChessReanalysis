@@ -100,6 +100,48 @@ def a1(working_set, report_name):
             fout.write('\n')
     print(f'Wrote report on {included} games to "{out_path}"')
 
+def a1csv(working_set, report_name):
+    p = load_a1_params()
+    by_player = defaultdict(PgnSpyResult)
+    by_game = defaultdict(PgnSpyResult)
+    excluded = included = 0
+    for gid, pgn in working_set.items():
+        game_obj, _ = Game.get_or_create(id=gid)
+        if not game_obj.is_analyzed:
+            excluded += 1
+            continue
+
+        a1_game(p, by_player, by_game, game_obj, pgn, 'w', GamePlayer.get(game=game_obj, color='w').player)
+        a1_game(p, by_player, by_game, game_obj, pgn, 'b', GamePlayer.get(game=game_obj, color='b').player)
+        included += 1
+    if excluded:
+        print(f'Skipping {excluded} games that haven\'t been pre-processed')
+
+    out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}--{report_name}.csv'
+    with open(out_path, 'w') as fout:
+        fout.write('Name,Rating range,T1:,T1%:,T2:,T2%:,T3:,T3%:,ACPL:,Positions,Games\n')
+        for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):
+            fout.write(f'{player.username},{result.min_rating} - {result.max_rating},')
+            if result.t1_total:
+                fout.write(f'{result.t1_count}/{result.t1_total},{result.t1_count / result.t1_total:.1%},')
+            else:
+            	fout.write('x,x,')
+            if result.t2_total:
+                fout.write(f'{result.t2_count}/{result.t2_total},{result.t2_count / result.t2_total:.1%},')
+            else:
+            	fout.write('x,x,')
+            if result.t3_total:
+                fout.write(f'{result.t3_count}/{result.t3_total},{result.t3_count / result.t3_total:.1%},')
+            else:
+            	fout.write('x,x,')
+            if result.acpl:
+                fout.write(f'{result.acpl:.1f},{result.sample_size},')
+            else:
+            	fout.write('x,x,')
+            fout.write(' '.join(result.game_list) + '\n')
+
+    print(f'Wrote report on {included} games to "{out_path}"')
+
 def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
     moves = list(Move.select().where(Move.game == game_obj).order_by(Move.number, -Move.color))
 
