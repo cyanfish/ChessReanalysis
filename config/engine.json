@@ -1,9 +1,9 @@
 {
     "path": "./engine/stockfish_8_x64_bmi2.exe",
     "nodes": 4500000,
-    "parallelism": 1,
+    "parallelism": 4,
     "options": {
         "Hash": 2048,
-        "Threads": 4
+        "Threads": 1
     }
 }

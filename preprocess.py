@@ -1,30 +1,44 @@
 from models import *
 import chess, chess.pgn, chess.uci
 import json
-from tqdm import trange, tqdm
-from multiprocessing import Pool, Value, Lock, Process, RLock, freeze_support
+import tqdm
+from multiprocessing import Pool, Process, Manager
 
-db_lock = None
+def progress(args):
+    total_moves = args['total_moves']
+    progress_queue = args['progress_queue']
+    pbar = tqdm.tqdm(total=total_moves, desc="Warming the engines")
+    quit = False
+    while not quit:
+        values = progress_queue.get()
+        if values == "QUIT":
+            quit = True
+        else:
+            number, id, move, total_moves = values
+            pbar.update(1)
+            pbar.set_description(f"#{number:02d} [{id}] {move: 3d}/{total_moves: 3d}")
 
-def init_process(l, rl):
-    global db_lock
-    db_lock = l
-    tqdm.set_lock(rl)
 
 def run(working_set):
     # Exclude already-processed games
-    freeze_support() # for Windows
     to_process = set(working_set.keys()) - {g.id for g in Game.select(Game.id).where(Game.is_analyzed == True)}
     print(f'Skipping {len(working_set) - len(to_process)} already-processed games')
-    print(f"Processing {parallelism}/{len(to_process)} games at a time")
 
     engine_config = load_engine_config()
     parallelism = engine_config.get('parallelism', 1)
-    lock = Lock()
-    rlock = RLock()
-    p = Pool(parallelism, initializer=init_process, initargs=(lock, rlock))
+    print("Starting pool")
+
+    manager = Manager()
+    progress_queue = manager.Queue()
+    lock = manager.Lock()
+    total_moves = 0
+    for gid in to_process:
+        total_moves += len(list(working_set[gid].main_line()))
+    pool = Pool(parallelism)
     process_args = [
         {
+            'progress_queue': progress_queue,
+            'db_lock': lock,
             'total': len(to_process),
             'game_number': i,
             "pgn": working_set[gid],
@@ -32,15 +46,28 @@ def run(working_set):
         } for i, gid in enumerate(to_process)
     ]
 
-    p.map(process_game, process_args)
+    print(f"Processing {parallelism} games at a time")
+    pool.map_async(process_game, process_args)
+    progress_args = ({
+        'total_moves': total_moves,
+        'progress_queue': progress_queue,
+        'db_lock': lock,
+    },)
+    p = Process(target=progress, args=progress_args)
+    p.start()
+    pool.close()
+    pool.join()
+    progress_queue.put("QUIT")
     p.join()
 
 def process_game(args):
+    #print("Process Game")
     game_number = args['game_number']
+    progress_queue = args['progress_queue']
+    db_lock = args['db_lock']
     gid = args['gid']
     pgn = args['pgn']
     moves = list(pgn.main_line())
-    reversed_moves = list(reversed(moves))
     # Get the game DB object and the PGN moves
     with db_lock:
         game_obj, _ = Game.get_or_create(id=gid)
@@ -63,8 +90,7 @@ def process_game(args):
 
     # Process each move in the game in reverse order
     moves_processed = 0
-    for i in trange(len(reversed_moves), desc=f"{game_number+1}:{gid}", position=game_number):
-        played_move = reversed_moves[i]
+    for played_move in reversed(moves):
         board.pop()
         moves_processed += 1
         color = 'w' if board.turn == chess.WHITE else 'b'
@@ -75,6 +101,7 @@ def process_game(args):
             continue
         except DoesNotExist:
             pass
+        progress_queue.put([game_number, gid, moves_processed, len(moves)])
 
         while True:
             try:
