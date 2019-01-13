@@ -1,16 +1,28 @@
 from models import *
 import chess, chess.pgn, chess.uci
 import json
-from multiprocessing import Pool, Value
+from tqdm import trange, tqdm
+from multiprocessing import Pool, Value, Lock, Process, RLock, freeze_support
+
+db_lock = None
+
+def init_process(l, rl):
+    global db_lock
+    db_lock = l
+    tqdm.set_lock(rl)
 
 def run(working_set):
     # Exclude already-processed games
+    freeze_support() # for Windows
     to_process = set(working_set.keys()) - {g.id for g in Game.select(Game.id).where(Game.is_analyzed == True)}
     print(f'Skipping {len(working_set) - len(to_process)} already-processed games')
+    print(f"Processing {parallelism}/{len(to_process)} games at a time")
 
     engine_config = load_engine_config()
     parallelism = engine_config.get('parallelism', 1)
-    p = Pool(parallelism)
+    lock = Lock()
+    rlock = RLock()
+    p = Pool(parallelism, initializer=init_process, initargs=(lock, rlock))
     process_args = [
         {
             'total': len(to_process),
@@ -20,22 +32,23 @@ def run(working_set):
         } for i, gid in enumerate(to_process)
     ]
 
-    print(f"Processing {parallelism} games at a time")
     p.map(process_game, process_args)
+    p.join()
 
 def process_game(args):
     game_number = args['game_number']
     gid = args['gid']
     pgn = args['pgn']
-    # Get the game DB object and the PGN moves
-    game_obj, _ = Game.get_or_create(id=gid)
     moves = list(pgn.main_line())
-    print(f'Processing {gid} ({len(moves)} moves) ({game_number})')
+    reversed_moves = list(reversed(moves))
+    # Get the game DB object and the PGN moves
+    with db_lock:
+        game_obj, _ = Game.get_or_create(id=gid)
 
-    white, _ = Player.get_or_create(username=pgn.headers['White'].lower())
-    black, _ = Player.get_or_create(username=pgn.headers['Black'].lower())
-    GamePlayer.get_or_create(game=game_obj, color='w', defaults={'player':white})
-    GamePlayer.get_or_create(game=game_obj, color='b', defaults={'player':black})
+        white, _ = Player.get_or_create(username=pgn.headers['White'].lower())
+        black, _ = Player.get_or_create(username=pgn.headers['Black'].lower())
+        GamePlayer.get_or_create(game=game_obj, color='w', defaults={'player':white})
+        GamePlayer.get_or_create(game=game_obj, color='b', defaults={'player':black})
 
     # Set up the engine
     engine_config = load_engine_config()
@@ -50,17 +63,18 @@ def process_game(args):
 
     # Process each move in the game in reverse order
     moves_processed = 0
-    for played_move in reversed(moves):
+    for i in trange(len(reversed_moves), desc=f"{game_number+1}:{gid}", position=game_number):
+        played_move = reversed_moves[i]
         board.pop()
         moves_processed += 1
         color = 'w' if board.turn == chess.WHITE else 'b'
         # Skip already-processed moves
         try:
-            move = Move.get(game=game_obj, color=color, number=board.fullmove_number)
+            with db_lock:
+                move = Move.get(game=game_obj, color=color, number=board.fullmove_number)
             continue
         except DoesNotExist:
             pass
-        print(f'{gid} -> {moves_processed}/{len(moves)}')
 
         while True:
             try:
@@ -92,18 +106,20 @@ def process_game(args):
                     played_eval = evals[played_index]
 
                 # Store the evaluations in the DB
-                move = Move.create(game=game_obj, color=color, number=board.fullmove_number, \
-                                pv1_eval=evals.get(1), pv2_eval=evals.get(2), pv3_eval=evals.get(3), \
-                                pv4_eval=evals.get(4), pv5_eval=evals.get(5), \
-                                played_rank=played_index, played_eval=played_eval, \
-                                nodes=info_handler.info.get('nodes'), masterdb_matches=masterdb_matches(board, move))
+                with db_lock:
+                    move = Move.create(game=game_obj, color=color, number=board.fullmove_number, \
+                                    pv1_eval=evals.get(1), pv2_eval=evals.get(2), pv3_eval=evals.get(3), \
+                                    pv4_eval=evals.get(4), pv5_eval=evals.get(5), \
+                                    played_rank=played_index, played_eval=played_eval, \
+                                    nodes=info_handler.info.get('nodes'), masterdb_matches=masterdb_matches(board, move))
                 break
             except TypeError:
                 # If we get a bad engine output, score_to_cp will throw a TypeError. We can just retry
                 continue
 
-    game_obj.is_analyzed = True
-    game_obj.save()
+    with db_lock:
+        game_obj.is_analyzed = True
+        game_obj.save()
     engine.quit()
 
 def masterdb_matches(board, move):
