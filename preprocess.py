@@ -46,7 +46,7 @@ def run(working_set):
         } for i, gid in enumerate(to_process)
     ]
 
-    print(f"Processing {parallelism} games at a time")
+    print(f"Processing {parallelism} / {len(to_process)} games at a time")
     pool.map_async(process_game, process_args)
     progress_args = ({
         'total_moves': total_moves,
