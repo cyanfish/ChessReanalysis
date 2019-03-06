@@ -15,12 +15,13 @@ _cp_loss_ops = [partial(eq,0)] + [partial(lt, cp_incr) for cp_incr in _cp_loss_i
 def generate_stats_string(sample, total):
     percentage = sample / total
     stderr = std_error(percentage, total)
-    ci = confidence_interval(percentage, stderr)
+    ci = wilson_interval(sample, total)
     return f'{sample}/{total}; {percentage:.01%} (CI: {ci[0]*100:.01f} - {ci[1]*100:.01f})'
 
 def std_error(p, n):
     return math.sqrt(p*(1-p)/n)
 
+# based on normal distribution, better to use wilson_interval defined below.
 def confidence_interval(p, e):
     return [
         p - (2.0*e),
@@ -241,7 +242,7 @@ def load_a1_params():
         return json.load(config_f)
 
 def wilson_interval(ns, n):
-    z = 1.96 # 0.95 confidence
+    z = 1.95996 # 0.95 confidence
     a = 1 / (n + z**2)
     b = ns + z**2 / 2
     c = z * (ns * (n - ns) / n + z**2 / 4)**(1/2)
