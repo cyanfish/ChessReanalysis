@@ -44,6 +44,7 @@ class PgnSpyResult():
         self.max_rating = None
         self.game_list = []
         self.cp_loss_count = defaultdict(int)
+        self.cp_loss_total = 0
 
     def add(self, other):
         self.sample_size += other.sample_size
@@ -61,6 +62,7 @@ class PgnSpyResult():
         self.game_list += other.game_list
         for k in _cp_loss_names:
             self.cp_loss_count[k] += other.cp_loss_count[k]
+        self.cp_loss_total += other.cp_loss_total
 
     def with_rating(self, rating):
         if rating is None:
@@ -87,7 +89,7 @@ def t_output(fout, result):
         fout.write('T3: {}\n'.format(generate_stats_string(result.t3_count, result.t3_total)))
     if result.acpl:
         fout.write(f'ACPL: {result.acpl:.1f} ({result.sample_size})\n')
-    total = result.t1_total + result.t2_total + result.t3_total
+    total = result.cp_loss_total
     if total > 0:
         for cp_loss_name in _cp_loss_names:
             loss_count = result.cp_loss_count[cp_loss_name]
@@ -196,33 +198,29 @@ def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
         if m.pv1_eval <= -p['undecided_pos_thresh'] or m.pv1_eval >= p['undecided_pos_thresh']:
             continue
 
-        include_cpl_loss = False
         if m.pv2_eval is not None and m.pv1_eval <= m.pv2_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv2_eval + p['unclear_pos_thresh']:
             if m.pv2_eval < m.pv1_eval:
                 r.t1_total += 1
-                include_cpl_loss = True
                 if m.played_rank and m.played_rank <= 1:
                     r.t1_count += 1
 
             if m.pv3_eval is not None and m.pv2_eval <= m.pv3_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv3_eval + p['unclear_pos_thresh']:
                 if m.pv3_eval < m.pv2_eval:
                     r.t2_total += 1
-                    include_cpl_loss = True
                     if m.played_rank and m.played_rank <= 2:
                         r.t2_count += 1
 
                 if m.pv4_eval is not None and m.pv3_eval <= m.pv4_eval + p['forced_move_thresh'] and m.pv1_eval <= m.pv4_eval + p['unclear_pos_thresh']:
                     if m.pv4_eval < m.pv3_eval:
                         r.t3_total += 1
-                        include_cpl_loss = True
                         if m.played_rank and m.played_rank <= 3:
                             r.t3_count += 1
 
         cpl = min(max(m.pv1_eval - m.played_eval, 0), p['max_cpl'])
-        if include_cpl_loss:
-            for cp_name, cp_op in zip(_cp_loss_names, _cp_loss_ops):
-                if cp_op(cpl):
-                    r.cp_loss_count[cp_name] += 1
+        r.cp_loss_total += 1
+        for cp_name, cp_op in zip(_cp_loss_names, _cp_loss_ops):
+            if cp_op(cpl):
+                r.cp_loss_count[cp_name] += 1
 
         if p['exclude_flat'] and cpl == 0 and evals[-3:] == [m.pv1_eval] * 3:
             # Exclude flat evals from CPL, e.g. dead drawn endings
