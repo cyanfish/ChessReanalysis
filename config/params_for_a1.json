@@ -7,5 +7,5 @@
     "exclude_forced": true,
     "include_only_unclear": true,
     "exclude_flat": true,
-    "max_cpl": 501
+    "max_cpl": 500
 }

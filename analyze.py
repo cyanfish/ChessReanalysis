@@ -18,6 +18,12 @@ def generate_stats_string(sample, total):
     ci = confidence_interval(percentage, stderr)
     return f'{sample}/{total}; {percentage:.01%} (CI: {ci[0]*100:.01f} - {ci[1]*100:.01f})'
 
+def generate_stats_string_csv(sample, total):
+    percentage = sample / total
+    stderr = std_error(percentage, total)
+    ci = confidence_interval(percentage, stderr)
+    return f'{sample}/{total},{percentage:.01%},{ci[0]*100:.01f},{ci[1]*100:.01f}'
+
 def std_error(p, n):
     return math.sqrt(p*(1-p)/n)
 
@@ -113,6 +119,15 @@ def t_output_csv(fout, result):
         fout.write(f'{result.acpl:.1f},{result.sample_size},')
     else:
         fout.write('x,x,')
+    total = result.cp_loss_total
+    if total > 0:
+        for cp_loss_name in _cp_loss_names:
+            loss_count = result.cp_loss_count[cp_loss_name]
+            stats_str = generate_stats_string_csv(loss_count, total)
+            fout.write(f'{stats_str},')
+    else:
+        for cp_loss_name in _cp_loss_names:
+            fout.write(f',,,,')
 
 def a1(working_set, report_name):
     p = load_a1_params()
@@ -167,7 +182,10 @@ def a1csv(working_set, report_name):
 
     out_path = f'reports/report-a1--{datetime.now():%Y-%m-%d--%H-%M-%S}--{report_name}.csv'
     with open(out_path, 'w') as fout:
-        fout.write('Name,Rating range,T1:,T1%:,T2:,T2%:,T3:,T3%:,ACPL:,Positions,Games\n')
+        cp_loss_name_string = ''
+        for cp_loss_name in _cp_loss_names:
+            cp_loss_name_string += f'CPL{cp_loss_name},CPL{cp_loss_name}%,CPL{cp_loss_name} CI lower,CPL{cp_loss_name} CI upper,'
+        fout.write(f'Name,Rating range,T1:,T1%:,T2:,T2%:,T3:,T3%:,ACPL:,Positions,{cp_loss_name_string}Games\n')
         for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):
             fout.write(f'{player.username},{result.min_rating} - {result.max_rating},')
             t_output_csv(fout, result)
@@ -216,12 +234,13 @@ def a1_game(p, by_player, by_game, game_obj, pgn, color, player):
                         if m.played_rank and m.played_rank <= 3:
                             r.t3_count += 1
 
-        cpl = min(max(m.pv1_eval - m.played_eval, 0), p['max_cpl'])
+        initial_cpl = max(m.pv1_eval - m.played_eval, 0)
         r.cp_loss_total += 1
         for cp_name, cp_op in zip(_cp_loss_names, _cp_loss_ops):
-            if cp_op(cpl):
+            if cp_op(initial_cpl):
                 r.cp_loss_count[cp_name] += 1
 
+        cpl = min(max(m.pv1_eval - m.played_eval, 0), p['max_cpl'])
         if p['exclude_flat'] and cpl == 0 and evals[-3:] == [m.pv1_eval] * 3:
             # Exclude flat evals from CPL, e.g. dead drawn endings
             continue
