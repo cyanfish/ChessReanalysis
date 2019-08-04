@@ -1,5 +1,5 @@
 from models import *
-import chess, chess.pgn, chess.uci
+import chess, chess.pgn, chess.engine
 import json
 import tqdm
 from multiprocessing import Pool, Process, Manager
@@ -33,7 +33,7 @@ def run(working_set):
     lock = manager.Lock()
     total_moves = 0
     for gid in to_process:
-        total_moves += len(list(working_set[gid].main_line()))
+        total_moves += len(list(working_set[gid].mainline_moves()))
     pool = Pool(parallelism)
     process_args = [
         {
@@ -67,7 +67,7 @@ def process_game(args):
     db_lock = args['db_lock']
     gid = args['gid']
     pgn = args['pgn']
-    moves = list(pgn.main_line())
+    moves = list(pgn.mainline_moves())
     # Get the game DB object and the PGN moves
     with db_lock:
         game_obj, _ = Game.get_or_create(id=gid)
@@ -80,8 +80,6 @@ def process_game(args):
     # Set up the engine
     engine_config = load_engine_config()
     engine = init_engine(engine_config)
-    info_handler = chess.uci.InfoHandler()
-    engine.info_handlers.append(info_handler)
 
     # Set up the board
     board = pgn.board()
@@ -106,15 +104,12 @@ def process_game(args):
         while True:
             try:
                 # Run the engine for the top 5 moves
-                engine.position(board)
-                engine.setoption({'multipv': 5})
-                engine.go(nodes=engine_config['nodes'])
-
+                info = engine.analyse(board, chess.engine.Limit(nodes=engine_config['nodes']), multipv=5, options=engine_config['options'])
                 # Get the engine results
-                pvs = {i: move_list[0] for (i, move_list) in info_handler.info['pv'].items()}
-                evals = {i: score_to_cp(s) for (i, s) in info_handler.info['score'].items()}
+                pvs = {i+1: info['pv'][0] for (i, info) in enumerate(info)}
+                evals = {i+1: score_to_cp(info['score']) for (i, info) in enumerate(info)}
                 played_index = None
-                for i, move in pvs.items():
+                for i, move in enumerate(pvs):
                     if move == played_move:
                         played_index = i
                 if not played_index:
@@ -123,10 +118,8 @@ def process_game(args):
                     if board.is_checkmate():
                         played_eval = 29999 if board.turn == chess.BLACK else -29999
                     else:
-                        engine.position(board)
-                        engine.setoption({'multipv': 1})
-                        engine.go(nodes=engine_config['nodes'])
-                        played_eval = -score_to_cp(info_handler.info['score'][1])
+                        one_move_info = engine.analyse(board, chess.engine.Limit(nodes=engine_config['nodes']), multipv=1, options=engine_config['options'])
+                        played_eval = -score_to_cp(one_move_info[0]['score'])
                     board.pop()
                 else:
                     # The played move was in the top 5, so we can copy the corresponding eval to save time
@@ -138,7 +131,7 @@ def process_game(args):
                                     pv1_eval=evals.get(1), pv2_eval=evals.get(2), pv3_eval=evals.get(3), \
                                     pv4_eval=evals.get(4), pv5_eval=evals.get(5), \
                                     played_rank=played_index, played_eval=played_eval, \
-                                    nodes=info_handler.info.get('nodes'), masterdb_matches=masterdb_matches(board, move))
+                                    nodes=info[0].get('nodes'), masterdb_matches=masterdb_matches(board, move))
                 break
             except TypeError:
                 # If we get a bad engine output, score_to_cp will throw a TypeError. We can just retry
@@ -154,16 +147,14 @@ def masterdb_matches(board, move):
 
 def score_to_cp(score):
     # Some arbitrary extreme values have been picked to represent mate
-    if score.mate:
-        return 30000 - score.mate if score.mate > 0 else -30000 - score.mate
-    return min(max(score.cp, -29000), 29000)
+    if score.is_mate():
+        return 30000 - score.relative.mate() if score.relative.mate() > 0 else -30000 - score.relative.mate()
+    return min(max(score.relative.score(), -29000), 29000)
 
 def load_engine_config():
     with open('./config/engine.json') as config_f:
         return json.load(config_f)
 
 def init_engine(config):
-    engine = chess.uci.popen_engine(config['path'])
-    engine.uci()
-    engine.setoption(config['options'])
+    engine = chess.engine.SimpleEngine.popen_uci(config['path'])
     return engine
