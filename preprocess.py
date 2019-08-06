@@ -109,7 +109,7 @@ def process_game(args):
                 pvs = {i+1: info['pv'][0] for (i, info) in enumerate(info)}
                 evals = {i+1: score_to_cp(info['score']) for (i, info) in enumerate(info)}
                 played_index = None
-                for i, move in enumerate(pvs):
+                for i, move in enumerate(pvs.values()):
                     if move == played_move:
                         played_index = i
                 if not played_index:
