@@ -27,7 +27,7 @@ def addpgn(filename):
             if not game:
                 break
             gid = gameid(game)
-            if gid:
+            if gid and game.headers.get('Variant') == 'Standard':
                 working_set[gid] = game
             n += 1
         print(f'Added {n} games to working set from {filename}')
