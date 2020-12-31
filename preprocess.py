@@ -4,6 +4,10 @@ import json
 import tqdm
 from multiprocessing import Pool, Process, Manager
 
+import sys
+
+sys.setrecursionlimit(10000)
+
 def progress(args):
     total_moves = args['total_moves']
     progress_queue = args['progress_queue']

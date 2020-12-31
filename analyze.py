@@ -21,8 +21,8 @@ def generate_stats_string(sample, total):
 def generate_stats_string_csv(sample, total):
     percentage = sample / total
     stderr = std_error(percentage, total)
-    ci = confidence_interval(percentage, stderr)
-    return f'{sample}/{total},{percentage:.01%},{ci[0]*100:.01f},{ci[1]*100:.01f}'
+    ci = wilson_interval(sample, total)
+    return f'{sample}/{total},{percentage:.01%},{ci[0]*100:.01f} - {ci[1]*100:.01f}'
 
 def std_error(p, n):
     return math.sqrt(p*(1-p)/n)
@@ -105,21 +105,21 @@ def t_output(fout, result):
 
 def t_output_csv(fout, result):
     if result.t1_total:
-        fout.write(f'{result.t1_count}/{result.t1_total},{result.t1_count / result.t1_total:.1%},')
+        fout.write(f'{generate_stats_string_csv(result.t1_count, result.t1_total)},')
     else:
-        fout.write('x,x,')
+        fout.write(',,,')
     if result.t2_total:
-        fout.write(f'{result.t2_count}/{result.t2_total},{result.t2_count / result.t2_total:.1%},')
+        fout.write(f'{generate_stats_string_csv(result.t2_count, result.t2_total)},')
     else:
-        fout.write('x,x,')
+        fout.write(',,,')
     if result.t3_total:
-        fout.write(f'{result.t3_count}/{result.t3_total},{result.t3_count / result.t3_total:.1%},')
+        fout.write(f'{generate_stats_string_csv(result.t3_count, result.t3_total)},')
     else:
-        fout.write('x,x,')
+        fout.write(',,,')
     if result.acpl:
         fout.write(f'{result.acpl:.1f},{result.sample_size},')
     else:
-        fout.write('x,x,')
+        fout.write(',,')
     total = result.cp_loss_total
     if total > 0:
         for cp_loss_name in _cp_loss_names:
@@ -128,7 +128,7 @@ def t_output_csv(fout, result):
             fout.write(f'{stats_str},')
     else:
         for cp_loss_name in _cp_loss_names:
-            fout.write(f',,,,')
+            fout.write(',,,,,,,,,,,,,,,,,,,,,,,,')
 
 def a1(working_set, report_name):
     p = load_a1_params()
@@ -154,7 +154,7 @@ def a1(working_set, report_name):
             fout.write(f'{player.username} ({result.min_rating} - {result.max_rating})\n')
             t_output(fout, result)
             fout.write(' '.join(result.game_list) + '\n')
-            fout.write('\n')
+            fout.write(str(len(result.game_list)) + ' games \n\n')
 
         fout.write('\n------ BY GAME ------\n\n')
         for (player, gameid), result in sorted(by_game.items(), key=lambda i: i[1].t3_sort):
@@ -185,12 +185,12 @@ def a1csv(working_set, report_name):
     with open(out_path, 'w') as fout:
         cp_loss_name_string = ''
         for cp_loss_name in _cp_loss_names:
-            cp_loss_name_string += f'CPL{cp_loss_name},CPL{cp_loss_name}%,CPL{cp_loss_name} CI lower,CPL{cp_loss_name} CI upper,'
-        fout.write(f'Name,Rating range,T1:,T1%:,T2:,T2%:,T3:,T3%:,ACPL:,Positions,{cp_loss_name_string}Games\n')
+            cp_loss_name_string += f'CPL{cp_loss_name},CPL{cp_loss_name}%,CPL{cp_loss_name} CI,'
+        fout.write(f'Name,Rating min,Rating max,T1:,T1%:,T1 CI,T2:,T2%:,T2 CI,T3:,T3%:,T3 CI,ACPL:,Positions,{cp_loss_name_string}# Games,Games\n')
         for player, result in sorted(by_player.items(), key=lambda i: i[1].t3_sort):
-            fout.write(f'{player.username},{result.min_rating} - {result.max_rating},')
+            fout.write(f'{player.username},{result.min_rating},{result.max_rating},')
             t_output_csv(fout, result)
-            fout.write(' '.join(result.game_list) + '\n')
+            fout.write(str(len(result.game_list)) + ',' + ' '.join(result.game_list) + '\n')
 
     print(f'Wrote report on {included} games to "{out_path}"')
 
