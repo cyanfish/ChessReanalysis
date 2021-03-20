@@ -20,14 +20,14 @@ def gameid(game):
     return match.group(3)
 
 def addpgn(filename):
-    with open(filename) as fin:
+    with open(filename, encoding="iso-8859-1") as fin:
         n = 0
         while True:
             game = chess.pgn.read_game(fin)
             if not game:
                 break
             gid = gameid(game)
-            if gid:
+            if gid and game.headers.get('Variant') == 'Standard':
                 working_set[gid] = game
             n += 1
         print(f'Added {n} games to working set from {filename}')
